@@ -62,7 +62,8 @@ class MeasurementContracts(unittest.TestCase):
             result = netdiag.check_host('example.com')
         self.assertEqual(sock.call_count, 4)
         self.assertEqual(result['error_stage'], 'tcp')
-        self.assertEqual(result['tcp_attempts'][0]['errno_name'], 'ENETUNREACH')
+        self.assertEqual(result['tcp_attempts'][0]['errno'], errno.ENETUNREACH)
+        self.assertIn(result['tcp_attempts'][0]['errno_name'], ('ENETUNREACH', 'WSAENETUNREACH'))
 
     def test_nearest_rank_p95_and_even_median(self):
         self.assertEqual(netdiag.quantiles(list(range(1, 21))), {'p50': 10.5, 'p95': 19})
@@ -73,6 +74,24 @@ class MeasurementContracts(unittest.TestCase):
         self.assertTrue(raw['synthetic'])
         self.assertEqual(raw['summary'], netdiag.summarize(raw['samples']))
         self.assertEqual((ROOT / 'examples/SYNTHETIC-REPORT.md').read_text(encoding='utf-8'), netdiag.make_report(raw))
+
+    def test_legacy_console_keeps_unicode_evidence_writable(self):
+        import io
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as tmp:
+            target = Path(tmp) / '診斷.json'
+            buffer = io.BytesIO()
+            stream = io.TextIOWrapper(buffer, encoding='cp1252', errors='strict')
+            failed = {'host': 'example.com', 'ok': False, 'error_stage': 'dns'}
+            with patch.object(netdiag.sys, 'stdout', stream), \
+                 patch.object(netdiag, 'check_host', return_value=failed):
+                self.assertEqual(netdiag.main(['run', '--host', 'example.com', '--repeat', '1',
+                                               '--pause', '0', '--isp', '測試業者', '--output', str(target)]), 0)
+            stream.flush()
+            self.assertIn(b'HTTPS=failed', buffer.getvalue())
+            self.assertEqual(json.loads(target.read_text(encoding='utf-8'))['metadata']['isp'], '測試業者')
+            self.assertIn('測試業者', target.with_suffix('.md').read_text(encoding='utf-8'))
+            stream.close()
 
     def test_windows_ping_does_not_invent_loss_from_localized_output(self):
         with patch.object(netdiag.platform, 'system', return_value='Windows'), \

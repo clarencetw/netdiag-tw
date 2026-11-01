@@ -442,13 +442,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return ap.parse_args(argv)
 
 
+def console(message: str) -> None:
+    """Keep legacy redirected Windows stdout from aborting evidence collection.
+
+    JSON and Markdown remain UTF-8; only unrepresentable console characters
+    are escaped using the output stream's existing encoding.
+    """
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    print(message.encode(encoding, errors="backslashreplace").decode(encoding))
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if args.command == "plan":
-        print("No network action will be taken. Presets only test HTTPS entry endpoints, not video streams.")
+        console("No network action will be taken. Presets only test HTTPS entry endpoints, not video streams.")
         for name, entries in PRESETS.items():
-            print(f"  {name}: " + ", ".join(host for _, host in entries))
-        print("Run: python3 scripts/netdiag.py run --preset basic --repeat 3 --access ethernet")
+            console(f"  {name}: " + ", ".join(host for _, host in entries))
+        console("Run: python3 scripts/netdiag.py run --preset basic --repeat 3 --access ethernet")
         return 0
     if args.command == "report":
         if Path(args.input).resolve() == Path(args.output).resolve():
@@ -461,7 +471,7 @@ def main(argv: list[str] | None = None) -> int:
             output.write_text(make_report(raw), encoding="utf-8")
         except (OSError, ValueError, TypeError, KeyError) as exc:
             raise SystemExit(f"Cannot create report: {exc}") from exc
-        print(f"Report written: {args.output}")
+        console(f"Report written: {args.output}")
         return 0
     if not (1 <= args.repeat <= 20 and 1 <= args.ping_count <= 60 and 1 <= args.mtr_cycles <= 60 and
             1.0 <= args.timeout <= 15.0 and 0 <= args.pause <= 10):
@@ -481,18 +491,18 @@ def main(argv: list[str] | None = None) -> int:
         "proxy": "direct sockets; environment HTTP proxies are not used; VPN routing still applies",
         "preset": "custom" if args.host else args.preset, "repeat": args.repeat, "method": "local_stdlib_https_entrance",
     }, "samples": []}
-    print(f"Running on THIS device/network. {len(entries)} hosts x {args.repeat} probes")
+    console(f"Running on THIS device/network. {len(entries)} hosts x {args.repeat} probes")
     for service, host in entries:
         for index in range(args.repeat):
             result = check_host(host, args.family, args.timeout)
             result.update(service=service, sequence=index+1)
             raw["samples"].append(result)
-            print(f"{service} [{index + 1}/{args.repeat}]: HTTPS={'ok' if result['ok'] else 'failed'}, {result.get('http_response_ms', '無')} ms")
+            console(f"{service} [{index + 1}/{args.repeat}]: HTTPS={'ok' if result['ok'] else 'failed'}, {result.get('http_response_ms', '無')} ms")
             if args.pause and (index < args.repeat-1 or host != entries[-1][1]):
                 time.sleep(args.pause)
     raw["summary"] = summarize(raw["samples"])
     if args.gateway:
-        print(f"Testing explicitly provided gateway: {args.gateway}")
+        console(f"Testing explicitly provided gateway: {args.gateway}")
         raw["gateway_ping"] = ping(args.gateway, args.ping_count)
     if args.mtr_host:
         # Pin optional MTR to a public destination IP actually reached by the
@@ -502,7 +512,7 @@ def main(argv: list[str] | None = None) -> int:
                         if sample.get("host") == args.mtr_host and sample.get("remote_ip")]
         if matching_ips:
             tested_ip = matching_ips[-1]
-            print(f"Testing optional MTR: {args.mtr_host} ({tested_ip})")
+            console(f"Testing optional MTR: {args.mtr_host} ({tested_ip})")
             raw["mtr"] = mtr(tested_ip, args.mtr_cycles)
             raw["mtr"]["target_hostname"] = args.mtr_host
             raw["mtr"]["destination_ip"] = tested_ip
@@ -515,7 +525,7 @@ def main(argv: list[str] | None = None) -> int:
     dest.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
     markdown_path = dest.with_suffix(".md")
     markdown_path.write_text(make_report(raw), encoding="utf-8")
-    print(f"Raw evidence: {dest}\nReadable report: {markdown_path}\nNo results were uploaded by this script.")
+    console(f"Raw evidence: {dest}\nReadable report: {markdown_path}\nNo results were uploaded by this script.")
     return 0
 
 
