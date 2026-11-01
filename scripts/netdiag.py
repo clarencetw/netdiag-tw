@@ -27,31 +27,67 @@ import time
 from typing import Any
 
 USER_AGENT = "netdiag-tw"
-PRESETS: dict[str, list[tuple[str, str]]] = {
-    "basic": [
-        ("Cloudflare", "cloudflare.com"),
-        ("Google", "www.google.com"),
-        ("Facebook", "www.facebook.com"),
-        ("YouTube", "www.youtube.com"),
-        ("Netflix", "www.netflix.com"),
-    ],
-    "social": [
-        ("Facebook", "www.facebook.com"),
-        ("Instagram", "www.instagram.com"),
-        ("Threads", "www.threads.net"),
-        ("X", "x.com"),
-    ],
-    "video": [
-        ("YouTube", "www.youtube.com"),
-        ("Netflix", "www.netflix.com"),
-        ("Twitch", "www.twitch.tv"),
-    ],
-    "developer": [
-        ("GitHub", "github.com"),
-        ("Cloudflare", "cloudflare.com"),
-        ("Google", "www.google.com"),
-    ],
+# 分組僅描述網站用途／服務市場，不代表節點所在地或實際網路路徑。
+# 報告並列觀察，不以品牌、網域或分組延遲推定國際出口問題。
+GROUP_LABELS = {
+    "baseline": "一般對照網站", "tw": "台灣服務網站", "region": "其他市場網站（非節點地理位置）",
+    "social": "社群", "video": "影音", "work": "居家辦公／雲端", "game": "遊戲", "ai": "AI 服務",
 }
+_T: dict[str, tuple[str, str, str]] = {
+    "cloudflare": ("Cloudflare", "cloudflare.com", "baseline"),
+    "google": ("Google", "www.google.com", "baseline"),
+    "hinet": ("中華電信 HiNet", "hinet.net", "tw"),
+    "gov": ("政府入口網", "www.gov.tw", "tw"),
+    "yahoo_tw": ("Yahoo 奇摩", "tw.yahoo.com", "tw"),
+    "pchome": ("PChome", "www.pchome.com.tw", "tw"),
+    "momo": ("momo", "www.momoshop.com.tw", "tw"),
+    "ltn": ("自由時報", "www.ltn.com.tw", "tw"),
+    "dcard": ("Dcard", "www.dcard.tw", "tw"),
+    "cht": ("中華電信官網", "www.cht.com.tw", "tw"),
+    "yahoo_jp": ("Yahoo Japan", "www.yahoo.co.jp", "region"),
+    "naver": ("Naver", "www.naver.com", "region"),
+    "gov_hk": ("香港政府", "www.gov.hk", "region"),
+    "gov_sg": ("新加坡政府", "www.gov.sg", "region"),
+    "amazon": ("Amazon US", "www.amazon.com", "region"),
+    "bbc": ("BBC", "www.bbc.co.uk", "region"),
+    "facebook": ("Facebook", "www.facebook.com", "social"),
+    "instagram": ("Instagram", "www.instagram.com", "social"),
+    "threads": ("Threads", "www.threads.net", "social"),
+    "x": ("X", "x.com", "social"),
+    "line": ("LINE", "line.me", "social"),
+    "discord": ("Discord", "discord.com", "social"),
+    "tiktok": ("TikTok", "www.tiktok.com", "social"),
+    "youtube": ("YouTube", "www.youtube.com", "video"),
+    "netflix": ("Netflix", "www.netflix.com", "video"),
+    "twitch": ("Twitch", "www.twitch.tv", "video"),
+    "disney": ("Disney+", "www.disneyplus.com", "video"),
+    "kkbox": ("KKBOX", "www.kkbox.com", "video"),
+    "zoom": ("Zoom", "zoom.us", "work"),
+    "teams": ("Microsoft Teams", "teams.microsoft.com", "work"),
+    "meet": ("Google Meet", "meet.google.com", "work"),
+    "icloud": ("iCloud", "www.icloud.com", "work"),
+    "github": ("GitHub", "github.com", "work"),
+    "steam": ("Steam", "store.steampowered.com", "game"),
+    "playstation": ("PlayStation", "www.playstation.com", "game"),
+    "claude": ("Claude", "claude.ai", "ai"),
+    "chatgpt": ("ChatGPT", "chatgpt.com", "ai"),
+}
+_PRESET_KEYS = {
+    "basic": ["cloudflare", "google", "facebook", "youtube", "netflix"],
+    # 多類網站入口；依序量測，不是同時或地理對照
+    "diagnose": ["cloudflare", "google", "hinet", "gov", "pchome", "yahoo_jp", "amazon", "bbc",
+                 "facebook", "line", "youtube", "netflix"],
+    "taiwan": ["hinet", "gov", "yahoo_tw", "pchome", "momo", "ltn", "dcard", "cht"],
+    "region": ["yahoo_jp", "naver", "gov_hk", "gov_sg", "amazon", "bbc"],
+    "social": ["facebook", "instagram", "threads", "x", "line", "discord", "tiktok"],
+    "video": ["youtube", "netflix", "twitch", "disney", "kkbox"],
+    "work": ["zoom", "teams", "meet", "icloud", "github"],
+    "game": ["steam", "playstation"],
+    "ai": ["claude", "chatgpt"],
+    "developer": ["github", "cloudflare", "google"],
+}
+PRESETS: dict[str, list[tuple[str, str, str]]] = {n: [_T[k] for k in keys] for n, keys in _PRESET_KEYS.items()}
+MAX_HOSTS = 12
 
 
 def now_iso() -> str:
@@ -316,6 +352,21 @@ def summarize(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return output
 
 
+def summarize_groups(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Per-role comparison from samples that carry a group; a phenomenon, not a verdict."""
+    output = []
+    for group in dict.fromkeys(s["group"] for s in samples if isinstance(s.get("group"), str)):
+        current = [s for s in samples if s.get("group") == group]
+        values = {k: [float(s[k]) for s in current if type(s.get(k)) in (int, float) and math.isfinite(s[k]) and s[k] >= 0]
+                  for k in ("tcp_ms", "http_response_ms")}
+        output.append({"group": group, "hosts": len({s["host"] for s in current}), "samples": len(current),
+                       "https_responses": sum(bool(s.get("ok")) for s in current),
+                       "tcp_ms_p50": quantiles(values["tcp_ms"])["p50"],
+                       "http_response_ms_p50": quantiles(values["http_response_ms"])["p50"],
+                       "stage_counts": {k: len(v) for k, v in values.items()}})
+    return output
+
+
 def markdown_text(value: Any) -> str:
     value = str(value).replace("\r", " ").replace("\n", " ")
     return "".join(f"&#{ord(c)};" if c in "&<>|`[]*_\\" else c for c in value)
@@ -351,6 +402,15 @@ def make_report(raw: dict[str, Any]) -> str:
             error_lines.append("\n失敗階段（" + markdown_text(item["service"]) + "）：" +
                          "、".join(f"{markdown_text(k)}={v}" for k, v in errors.items()) + "\n")
     lines.extend(error_lines)
+    groups = summarize_groups(raw["samples"]) if "samples" in raw else []
+    if groups:
+        lines.extend(["", "### 分組對照（現象並列，不是故障判定）", "",
+                      "| 分組 | 目標數 | 取得 HTTP 回應 | TCP 有值樣本 | TCP p50 (ms) | HTTP 有值樣本 | HTTP 回應時間 p50 (ms) |", "|---|---:|---:|---:|---:|---:|---:|"])
+        for g in groups:
+            lines.append(f"| {markdown_text(GROUP_LABELS.get(g['group'], g['group']))} | {g['hosts']} | "
+                         f"{g['https_responses']}/{g['samples']} | {g['stage_counts']['tcp_ms']} | {g['tcp_ms_p50'] if g['tcp_ms_p50'] is not None else '無'} | "
+                         f"{g['stage_counts']['http_response_ms']} | {g['http_response_ms_p50'] if g['http_response_ms_p50'] is not None else '無'} |")
+        lines.extend(["", "分組只描述網站用途或服務市場，不代表節點所在地、近端距離或是否經過國際線路。CDN／anycast 與服務端處理會影響結果，不能直接判定為海纜或 ISP 故障。分組 p50 合併各站有值樣本，並非各站中位數的平均；請先比較單站結果及有效樣本數。"])
     lines.extend(["", "## 客觀觀察與限制", ""])
     failing = [s for s in summary if s["https_responses"] < s["samples"]]
     if failing:
@@ -409,6 +469,8 @@ def validate_evidence(raw: Any) -> None:
                 raise ValueError("Timing values must be finite nonnegative numbers")
         if "error_stage" in sample and not isinstance(sample["error_stage"], str):
             raise ValueError("Invalid error stage")
+        if "group" in sample and not isinstance(sample["group"], str):
+            raise ValueError("Invalid group")
     for key in ("mtr", "gateway_ping"):
         if key in raw and not isinstance(raw[key], dict):
             raise ValueError(f"Expected {key} object")
@@ -457,8 +519,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "plan":
         console("No network action will be taken. Presets only test HTTPS entry endpoints, not video streams.")
         for name, entries in PRESETS.items():
-            console(f"  {name}: " + ", ".join(host for _, host in entries))
-        console("Run: python3 scripts/netdiag.py run --preset basic --repeat 3 --access ethernet")
+            console(f"  {name} ({len(entries)} hosts): " + ", ".join(host for _, host, _g in entries))
+        console(f"Each run is at most {MAX_HOSTS} hosts; HTTPS GETs <= hosts x --repeat (upper bound; failed setup sends no GET).")
+        console("Run: python3 scripts/netdiag.py run --preset diagnose --repeat 3 --access ethernet")
         return 0
     if args.command == "report":
         if Path(args.input).resolve() == Path(args.output).resolve():
@@ -478,8 +541,10 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("Out-of-range probe parameters")
     if args.host and len(args.host) > 5:
         raise SystemExit("At most five custom hostnames are allowed")
-    entries = [(f"Custom {i+1}", host) for i, host in enumerate(args.host)] if args.host else PRESETS[args.preset]
-    if args.mtr_host and args.mtr_host not in [host for _label, host in entries]:
+    entries = [(f"Custom {i+1}", host, "custom") for i, host in enumerate(args.host)] if args.host else PRESETS[args.preset]
+    if len(entries) > MAX_HOSTS:
+        raise SystemExit(f"At most {MAX_HOSTS} hosts per run")
+    if args.mtr_host and args.mtr_host not in [host for _label, host, _group in entries]:
         raise SystemExit("--mtr-host must be one of the hosts selected for this run")
     if Path(args.output).suffix.lower() != ".json":
         raise SystemExit("--output must end in .json (a separate .md report is written)")
@@ -492,13 +557,13 @@ def main(argv: list[str] | None = None) -> int:
         "preset": "custom" if args.host else args.preset, "repeat": args.repeat, "method": "local_stdlib_https_entrance",
     }, "samples": []}
     console(f"Running on THIS device/network. {len(entries)} hosts x {args.repeat} probes")
-    for service, host in entries:
+    for position, (service, host, group) in enumerate(entries):
         for index in range(args.repeat):
             result = check_host(host, args.family, args.timeout)
-            result.update(service=service, sequence=index+1)
+            result.update(service=service, group=group, sequence=index+1)
             raw["samples"].append(result)
             console(f"{service} [{index + 1}/{args.repeat}]: HTTPS={'ok' if result['ok'] else 'failed'}, {result.get('http_response_ms', '無')} ms")
-            if args.pause and (index < args.repeat-1 or host != entries[-1][1]):
+            if args.pause and (index < args.repeat-1 or position < len(entries)-1):
                 time.sleep(args.pause)
     raw["summary"] = summarize(raw["samples"])
     if args.gateway:

@@ -9,6 +9,61 @@ netdiag = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(netdiag)
 
 class TestNetdiag(unittest.TestCase):
+    def test_all_preset_hosts_are_valid_public_hostnames(self):
+        for name, entries in netdiag.PRESETS.items():
+            self.assertLessEqual(len(entries), netdiag.MAX_HOSTS, name)
+            for _label, host, group in entries:
+                self.assertEqual(netdiag.valid_public_hostname(host), host, name)
+                self.assertIn(group, netdiag.GROUP_LABELS, name)
+        self.assertIn('taiwan', netdiag.PRESETS)
+        self.assertIn('diagnose', netdiag.PRESETS)
+
+    def test_group_summary_and_report_section(self):
+        samples = [
+            {'service': 'A', 'host': 'a.example.com', 'group': 'tw', 'ok': True, 'http_status': 200, 'tcp_ms': 10, 'http_response_ms': 30},
+            {'service': 'B', 'host': 'b.example.com', 'group': 'region', 'ok': False, 'error_stage': 'tcp'},
+        ]
+        groups = {g['group']: g for g in netdiag.summarize_groups(samples)}
+        self.assertEqual(groups['tw']['https_responses'], 1)
+        self.assertIsNone(groups['region']['tcp_ms_p50'])
+        raw = {'schema_version': '1', 'metadata': {}, 'samples': samples}
+        netdiag.validate_evidence(raw)
+        report = netdiag.make_report(raw)
+        self.assertIn('分組對照', report)
+        self.assertIn('不能直接判定為海纜或 ISP', report)
+        self.assertIn('不代表節點所在地', report)
+        self.assertEqual(groups['region']['stage_counts']['tcp_ms'], 0)
+        self.assertEqual(groups['tw']['stage_counts']['http_response_ms'], 1)
+        raw['samples'][0]['group'] = 5
+        with self.assertRaises(ValueError):
+            netdiag.validate_evidence(raw)
+
+    def test_group_metrics_keep_valid_counts_and_pool_samples(self):
+        samples = [
+            {'service': 'A', 'host': 'a.test', 'group': 'tw', 'ok': True, 'tcp_ms': 10},
+            {'service': 'A', 'host': 'a.test', 'group': 'tw', 'ok': False, 'tcp_ms': 20},
+            {'service': 'B', 'host': 'b.test', 'group': 'tw', 'ok': False, 'tcp_ms': 100},
+            {'service': 'B', 'host': 'b.test', 'group': 'tw', 'ok': False},
+        ]
+        group = netdiag.summarize_groups(samples)[0]
+        self.assertEqual(group['tcp_ms_p50'], 20)
+        self.assertEqual(group['stage_counts'], {'tcp_ms': 3, 'http_response_ms': 0})
+        self.assertEqual((group['samples'], group['https_responses']), (4, 1))
+
+    def test_plan_describes_request_upper_bound_without_network(self):
+        import contextlib
+        import io
+        output = io.StringIO()
+        with patch.object(netdiag, 'check_host') as probe, contextlib.redirect_stdout(output):
+            self.assertEqual(netdiag.main(['plan']), 0)
+        probe.assert_not_called()
+        self.assertIn('HTTPS GETs <=', output.getvalue())
+
+    def test_samples_without_group_have_no_group_section(self):
+        raw = {'schema_version': '1', 'metadata': {}, 'samples': [
+            {'service': 'A', 'host': 'a.example.com', 'ok': True, 'http_status': 200, 'http_response_ms': 5}]}
+        self.assertNotIn('分組對照', netdiag.make_report(raw))
+
     def test_public_ips_exclude_nonpublic(self):
         fake = [
             (2, 1, 6, '', ('192.168.0.1', 443)),

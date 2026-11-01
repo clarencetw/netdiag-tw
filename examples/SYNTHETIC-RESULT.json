@@ -20,7 +20,8 @@
       "tcp_ms": 6,
       "tls_ms": 24,
       "elapsed_to_first_byte_ms": 59,
-      "http_response_ms": 17
+      "http_response_ms": 17,
+      "group": "baseline"
     },
     {
       "service": "Cloudflare",
@@ -31,7 +32,8 @@
       "tcp_ms": 7,
       "tls_ms": 26,
       "elapsed_to_first_byte_ms": 62,
-      "http_response_ms": 18
+      "http_response_ms": 18,
+      "group": "baseline"
     },
     {
       "service": "Cloudflare",
@@ -42,14 +44,16 @@
       "tcp_ms": 8,
       "tls_ms": 27,
       "elapsed_to_first_byte_ms": 64,
-      "http_response_ms": 16
+      "http_response_ms": 16,
+      "group": "baseline"
     },
     {
       "service": "Facebook",
       "host": "www.facebook.com",
       "ok": false,
       "error_stage": "tcp",
-      "error": "Synthetic connection timeout"
+      "error": "Synthetic connection timeout",
+      "group": "social"
     },
     {
       "service": "Facebook",
@@ -60,14 +64,16 @@
       "tcp_ms": 60,
       "tls_ms": 45,
       "elapsed_to_first_byte_ms": 220,
-      "http_response_ms": 103
+      "http_response_ms": 103,
+      "group": "social"
     },
     {
       "service": "Facebook",
       "host": "www.facebook.com",
       "ok": false,
       "error_stage": "tcp",
-      "error": "Synthetic connection timeout"
+      "error": "Synthetic connection timeout",
+      "group": "social"
     }
   ],
   "summary": [
