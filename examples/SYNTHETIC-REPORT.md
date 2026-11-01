@@ -1,0 +1,61 @@
+> **虛構示範數據，沒有測試任何真實固網。**
+
+# 台灣固網診斷紀錄
+
+- 量測時間：2026-11-01T20:30:00+08:00
+- ISP：示範 ISP（虛構）；申辦速率：示範方案
+- 連線方式：ethernet；使用環境：Example only (not a live measurement)
+- Address family：v4；每站測試：3 次
+
+## HTTPS 入口可達性（不是完整網頁／影片效能）
+
+| 服務 | 網站 | 取得 HTTP 回應 | HTTP 狀態碼 | HTTP 回應時間 p50 / p95 (ms) |
+|---|---|---:|---|---:|
+| Cloudflare | cloudflare.com | 3/3 | 200 | 17.0 / 18.0 |
+| Facebook | www.facebook.com | 1/3 | 200 | 103.0 / 103.0 |
+
+### 分階段量測（各階段有數值的樣本；不是只取 HTTPS 成功樣本）
+
+| 服務 | 指標 | 有效樣本 | p50 / p95 (ms) |
+|---|---|---:|---:|
+| Cloudflare | dns_ms | 3 | 12.0 / 13.0 |
+| Cloudflare | tcp_ms | 3 | 7.0 / 8.0 |
+| Cloudflare | tls_ms | 3 | 26.0 / 27.0 |
+| Cloudflare | http_response_ms | 3 | 17.0 / 18.0 |
+| Cloudflare | elapsed_to_first_byte_ms | 3 | 62.0 / 64.0 |
+| Facebook | dns_ms | 1 | 12.0 / 12.0 |
+| Facebook | tcp_ms | 1 | 60.0 / 60.0 |
+| Facebook | tls_ms | 1 | 45.0 / 45.0 |
+| Facebook | http_response_ms | 1 | 103.0 / 103.0 |
+| Facebook | elapsed_to_first_byte_ms | 1 | 220.0 / 220.0 |
+
+失敗階段（Facebook）：tcp=2
+
+
+## 客觀觀察與限制
+
+- 有 HTTPS 入口測試未取得有效最終 HTTP 狀態列：Facebook。需與同時段其他服務、不同連線方式和 DNS/路由資料交叉驗證。
+- 單站樣本少於 10 次，不能憑此推斷間歇性掉封包或 ISP 故障。
+- HTTP 回應時間是送出 HTTP/1.1 GET 後到收到第一個回應位元組，不含 DNS/TCP/TLS；`elapsed_to_first_byte_ms` 才包含整體建連過程。
+- 首位元組可能屬於 1xx 暫時回應；各階段依有值樣本計算，請一起看有效樣本數、狀態碼與失敗數。
+- DNS 計時含系統解析與快取；各網站依序測量，不是同時控制組。探針不使用瀏覽器或環境變數 HTTP Proxy；VPN 路由仍適用。
+- HTTPS 回應成功率是完整最終 HTTP 狀態列取得比例（200–599；只有 1xx 不算完成），**不是封包遺失率**；403、302 等回應也算有回應。
+- 本工具只測 HTTPS/1.1 首次連線；不代表瀏覽器（HTTP/2、HTTP/3、QUIC）、影片播放啟動、影片緩衝或整頁載入時間。
+- IPv4/IPv6 自動模式沒有模擬瀏覽器 Happy Eyeballs；結果受 DNS、IP、Anycast、CDN、TLS 與服務端回應影響。
+- 沒有實際來回路由或海纜載流證據時，不要宣稱某條海纜、某個中繼路由器或 ISP 必然有故障。
+
+## 建議補充測試
+
+- 用有線網路重測，並與 Wi-Fi 對比；避開 VPN/Proxy，記錄是否使用。
+- 問題發生當下與非尖峰時段各測一次；記錄時間、測試時長、受影響應用與操作。
+- 選定同一目的地，分別比較 IPv4 / IPv6、TCP/443 MTR 和應用實際體驗。
+- 影片卡頓時保留播放器統計（如 YouTube Stats for Nerds）與出問題的實際時間。
+- 必要時使用 Cloudflare Speed / FAST.com 的 Unloaded/Loaded Latency 與吞吐量作輔助比較。
+
+## 建議向 ISP 報修的文字
+
+您好，我使用貴公司的固網服務，在【日期時間】連線【服務】時發生【實際症狀】。
+已於【有線/無線】環境測試，在【測量時段】依序對照【服務與結果】；附件包含 HTTPS 測試紀錄，其他路由與播放器證據如有也一併附上。
+請協助確認線路品質、連線記錄及相關路由／互連品質，並提供障礙案件編號和後續回覆方式。
+
+_產出的內容是診斷線索，不是故障責任鑑定或具法律認證的測速報告。_

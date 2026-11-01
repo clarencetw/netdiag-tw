@@ -1,0 +1,157 @@
+{
+  "schema_version": "1",
+  "synthetic": true,
+  "metadata": {
+    "started": "2026-11-01T20:30:00+08:00",
+    "platform": "Example only (not a live measurement)",
+    "isp": "示範 ISP（虛構）",
+    "plan": "示範方案",
+    "access": "ethernet",
+    "family": "v4",
+    "repeat": 3
+  },
+  "samples": [
+    {
+      "service": "Cloudflare",
+      "host": "cloudflare.com",
+      "ok": true,
+      "http_status": 200,
+      "dns_ms": 12,
+      "tcp_ms": 6,
+      "tls_ms": 24,
+      "elapsed_to_first_byte_ms": 59,
+      "http_response_ms": 17
+    },
+    {
+      "service": "Cloudflare",
+      "host": "cloudflare.com",
+      "ok": true,
+      "http_status": 200,
+      "dns_ms": 11,
+      "tcp_ms": 7,
+      "tls_ms": 26,
+      "elapsed_to_first_byte_ms": 62,
+      "http_response_ms": 18
+    },
+    {
+      "service": "Cloudflare",
+      "host": "cloudflare.com",
+      "ok": true,
+      "http_status": 200,
+      "dns_ms": 13,
+      "tcp_ms": 8,
+      "tls_ms": 27,
+      "elapsed_to_first_byte_ms": 64,
+      "http_response_ms": 16
+    },
+    {
+      "service": "Facebook",
+      "host": "www.facebook.com",
+      "ok": false,
+      "error_stage": "tcp",
+      "error": "Synthetic connection timeout"
+    },
+    {
+      "service": "Facebook",
+      "host": "www.facebook.com",
+      "ok": true,
+      "http_status": 200,
+      "dns_ms": 12,
+      "tcp_ms": 60,
+      "tls_ms": 45,
+      "elapsed_to_first_byte_ms": 220,
+      "http_response_ms": 103
+    },
+    {
+      "service": "Facebook",
+      "host": "www.facebook.com",
+      "ok": false,
+      "error_stage": "tcp",
+      "error": "Synthetic connection timeout"
+    }
+  ],
+  "summary": [
+    {
+      "service": "Cloudflare",
+      "host": "cloudflare.com",
+      "samples": 3,
+      "https_responses": 3,
+      "success_ratio": 1.0,
+      "stages_ms": {
+        "dns_ms": {
+          "p50": 12.0,
+          "p95": 13.0
+        },
+        "tcp_ms": {
+          "p50": 7.0,
+          "p95": 8.0
+        },
+        "tls_ms": {
+          "p50": 26.0,
+          "p95": 27.0
+        },
+        "http_response_ms": {
+          "p50": 17.0,
+          "p95": 18.0
+        },
+        "elapsed_to_first_byte_ms": {
+          "p50": 62.0,
+          "p95": 64.0
+        }
+      },
+      "stage_counts": {
+        "dns_ms": 3,
+        "tcp_ms": 3,
+        "tls_ms": 3,
+        "http_response_ms": 3,
+        "elapsed_to_first_byte_ms": 3
+      },
+      "errors": {},
+      "statuses": [
+        200
+      ]
+    },
+    {
+      "service": "Facebook",
+      "host": "www.facebook.com",
+      "samples": 3,
+      "https_responses": 1,
+      "success_ratio": 0.333,
+      "stages_ms": {
+        "dns_ms": {
+          "p50": 12.0,
+          "p95": 12.0
+        },
+        "tcp_ms": {
+          "p50": 60.0,
+          "p95": 60.0
+        },
+        "tls_ms": {
+          "p50": 45.0,
+          "p95": 45.0
+        },
+        "http_response_ms": {
+          "p50": 103.0,
+          "p95": 103.0
+        },
+        "elapsed_to_first_byte_ms": {
+          "p50": 220.0,
+          "p95": 220.0
+        }
+      },
+      "stage_counts": {
+        "dns_ms": 1,
+        "tcp_ms": 1,
+        "tls_ms": 1,
+        "http_response_ms": 1,
+        "elapsed_to_first_byte_ms": 1
+      },
+      "errors": {
+        "tcp": 2
+      },
+      "statuses": [
+        200
+      ]
+    }
+  ]
+}

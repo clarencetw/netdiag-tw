@@ -1,0 +1,20 @@
+# local data and potentially sensitive network reports
+results/
+reports/
+netdiag-result.json
+netdiag-result.md
+netdiag-report.md
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# local config
+.env
+.env.*
+.DS_Store
+.idea/
+.vscode/
